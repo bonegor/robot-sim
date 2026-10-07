@@ -1,0 +1,27 @@
+{
+  "format": "robot-sim/blueprint",
+  "version": 1,
+  "name": "Kicker",
+  "description": "A pinned block with one leg that kicks while Space is held. Open it with the Open button.",
+  "parts": [
+    { "id": "base", "type": "block", "pinned": true },
+    { "id": "leg", "type": "bone", "size": { "length": 0.3 } }
+  ],
+  "joints": [
+    {
+      "id": "knee",
+      "type": "hinge",
+      "parent": { "part": "base", "snap": "bottom" },
+      "child": { "part": "leg", "snap": "top" },
+      "dofs": {
+        "bend": {
+          "drive": {
+            "mode": "servo",
+            "signal": { "kind": "expression", "expr": "key(\"space\") ? -1.2 : 0.2" }
+          }
+        }
+      }
+    }
+  ],
+  "spawn": { "position": { "x": 0, "y": 0.8, "z": 0 } }
+}

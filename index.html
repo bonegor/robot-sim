@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Robot Sim</title>
+    <meta name="description" content="Snap together robots from bones, plates, wheels and nature-inspired joints, then simulate them in 3D." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='9' width='20' height='13' rx='4' fill='%23f77f00'/%3E%3Ccircle cx='12' cy='15' r='2.5' fill='white'/%3E%3Ccircle cx='20' cy='15' r='2.5' fill='white'/%3E%3Crect x='9' y='22' width='3' height='7' rx='1.5' fill='%234f7cac'/%3E%3Crect x='20' y='22' width='3' height='7' rx='1.5' fill='%234f7cac'/%3E%3Crect x='15' y='3' width='2' height='6' fill='%234f7cac'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <header id="toolbar"></header>
+    <main>
+      <aside id="palette" aria-label="Parts and joints"></aside>
+      <section id="viewport">
+        <div id="hud"></div>
+        <div id="tip"></div>
+        <div id="loading">Loading physics…</div>
+      </section>
+      <aside id="inspector" aria-label="Inspector"></aside>
+    </main>
+
+    <dialog id="help">
+      <form method="dialog"><button class="close" aria-label="Close">×</button></form>
+      <h2>Robot Sim</h2>
+      <p>Snap building blocks together with joints, decide which joints flop around and which ones follow a signal, then let physics take over.</p>
+
+      <h3>Building</h3>
+      <ol>
+        <li><b>Where?</b> Click a <span class="dot"></span> blue dot on the robot. Each dot is a snap point; the yellow arrow shows which way the new part will stick out.</li>
+        <li><b>Joint:</b> pick how the new part connects — a hinge like a knee, a ball like a hip, an axle for a wheel…</li>
+        <li><b>Part:</b> click a building block. It snaps on, and the next dot is pre-selected at its far end, so chains are quick.</li>
+      </ol>
+      <p>Click any part to change its size, its joint and how each joint moves. <kbd>R</kbd> turns the selected part's joint by 90°, <kbd>Delete</kbd> removes it (and everything hanging off it), <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes. Drag to orbit, scroll to zoom, right-drag to pan.</p>
+
+      <h3>Free or driven?</h3>
+      <p>Every joint has one or more degrees of freedom (a hinge has one, a ball joint three). Each one gets a <b>drive</b>:</p>
+      <ul class="drives">
+        <li><span class="sw free"></span><b>Free</b> — floppy, swings under gravity and contact.</li>
+        <li><span class="sw spring"></span><b>Spring</b> — passive but elastic, pulls back to its rest position like a tendon.</li>
+        <li><span class="sw servo"></span><b>Servo</b> — moves to the <i>position</i> its signal asks for.</li>
+        <li><span class="sw motor"></span><b>Motor</b> — turns or slides at the <i>speed</i> its signal asks for (wheels!).</li>
+      </ul>
+      <p>A driven joint's <b>signal</b> can be a <b>wave</b> (sine, square, triangle, saw, pulse — shift the phase between legs to make a gait), the <b>keyboard</b>, a <b>logic</b> formula (time, keys, sensors such as <code>roll</code>, <code>angle("knee")</code>, <code>touching("paw")</code>, comparisons, <code>if ? then : else</code>…), a shared <b>channel</b> of the robot, or a <b>constant</b>.</p>
+
+      <h3>Joints from nature</h3>
+      <table>
+        <tr><td>Hinge</td><td>elbow, knee, fingers</td><td>bend</td></tr>
+        <tr><td>Pivot</td><td>neck (atlas–axis), forearm</td><td>twist</td></tr>
+        <tr><td>Ball &amp; socket</td><td>hip, shoulder</td><td>bend, swing, twist</td></tr>
+        <tr><td>Saddle</td><td>base of the thumb</td><td>bend, swing</td></tr>
+        <tr><td>Condyloid</td><td>wrist, knuckles</td><td>bend, small swing</td></tr>
+        <tr><td>Gliding</td><td>wrist &amp; ankle bones</td><td>two small slides</td></tr>
+        <tr><td>Spine disc</td><td>vertebrae</td><td>springy bend, swing, twist</td></tr>
+        <tr><td>Weld</td><td>skull sutures</td><td>none</td></tr>
+        <tr><td>Axle, Slider</td><td>robotic: wheel hub, piston</td><td>spin / slide</td></tr>
+      </table>
+
+      <h3>Simulating</h3>
+      <p>Press <b>▶ Simulate</b>. Keys you hold go to the robot, clicking a part pokes it, and drives and signals can be tuned live in the inspector (choose <i>Plot this</i> to see target vs. actual). <kbd>Esc</kbd> goes back to building.</p>
+      <p>Robots are saved in your browser automatically; <b>Save</b>/<b>Open</b> exchange them as JSON blueprints.</p>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
