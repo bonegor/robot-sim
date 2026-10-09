@@ -7,8 +7,8 @@ Then decide, joint by joint, what is **free and floppy** and what **follows a
 signal**: a wave, the keyboard, a logic formula reading sensors, or a controller
 written in code. Press *Simulate* and the robot comes alive in a 3D physics world.
 
-![Building: a dog's hip set to follow a sine wave](docs/build.png)
-![Simulating: a hexapod walking with a tripod gait](docs/simulate.png)
+![Building: the dog's hip follows a formula on the shared gait clock, with balance reflexes](docs/build.png)
+![Simulating: a spider walking an alternating tetrapod gait, one hip plotted live](docs/simulate.png)
 
 ## Quick start
 
@@ -135,13 +135,43 @@ you type: unknown joints, DOFs, parts or channels are reported with a position.
 
 | Example | Shows |
 |---|---|
-| **Dog** | Trotting quadruped: hips and knees are servos following phase-shifted sine and pulse waves (diagonal legs in step); the tail is three springy spine discs; the head swings on a hinge turned 90°. |
+| **Dog** | The robot you start with: a steerable trotting quadruped. One `gait` clock drives servo hips and knees, diagonal legs in step; reflexes on `roll` and `pitch` extend the legs on the low side, and each paw sits on a *gliding* ankle that sweeps it sideways in stance — which is what lets a trot turn without its feet skidding. It walks off on its own: ←/→ steer, ↓ backs up, Space stops and starts it. Springy tail, floppy ears, and a head that looks into turns. |
+| **Spider** | An arachnid: eight legs fanned out like a spider's, walking an alternating tetrapod gait (L1 R2 L3 R4, then the other four). Each leg is two hinges — a hip turned a quarter turn swings it fore and aft, a knee lifts it. Steers like the dog and spins on the spot; the abdomen bobs on a spring and the fangs twitch. |
+| **Salamander** | A sprawling quadruped whose spine and tail swing in a wave locked to the legs. Timed right, the wave lengthens the stride (about 40% faster than the legs alone); timed wrong, it stalls. The neck turns against the wave to keep the head steady, and it steers by bending its spine. |
 | **Hexapod** | Tripod gait; every hip is a *saddle* joint with both axes driven by different waves. |
 | **Rover** | Four wheel motors mixing `throttle` and `steer` channels built from the keyboard (arrows / WASD); a springy antenna. |
+| **Balancer** | A two-wheeled inverted pendulum that stays up only through feedback: logic channels turn `pitch` into a lean, a speed loop on `forward` decides the lean it should hold, and the wheels run at `300 · ∫error + 60 · error`. Drive with ↑/↓, turn with ←/→, shove its head; its arms swing free. |
 | **Snake** | A travelling wave down a chain of servo hinges; free-spinning side wheels give the grip that turns it into forward motion. |
 | **Robot arm** | Pinned to the floor; keys jog the turntable (pivot), shoulder, elbow and wrist (condyloid); the fingers dangle on free hinges. |
 | **Pendulum chain** | Nothing driven at all: a hinge and ball joints released from a bent pose. |
 | **Empty plate** | Start from scratch. |
+
+## Making a walker work
+
+The Dog, Spider and Salamander are built from the same recipe:
+
+- **Single-axis joints in a chain.** Legs are hinges: a hip, then a knee. On a
+  side snap, a hinge turned a quarter turn (`R`) swings the leg fore and aft;
+  the next hinge, turned back, bends it down. Joints with several *driven*
+  rotation axes (saddle, ball, condyloid) are solved together by the physics
+  engine and go soft when they are bent and carrying weight — fine for a wrist
+  or a tail, not for a leg. Avoid small, light parts sandwiched between two
+  joints: a chain sags at such a link.
+- **One clock for every leg.** A channel `gait = integrate(2)` counts gait
+  cycles. Each hip follows `rest + stride * wave(gait + phase)` and each knee
+  `bend - lift * pulse(gait + phase + 0.75)`, which lifts the foot only while it
+  swings forward. The phases make the gait: diagonal pairs at 0 and 0.5 trot,
+  alternating groups of three or four legs make tripod and tetrapod gaits.
+- **Reflexes.** `roll` and `pitch` read the body's lean. Adding them to the
+  legs' crouch (`0.5 + roll + 0.25 * pitch` on the front left leg) extends the
+  legs on the low side, which keeps a trotting dog from tipping over.
+- **Turning needs sideways motion.** Feet in stance cannot skid, so a trot
+  whose legs only swing fore and aft goes straight however unequal the strides
+  are. Something has to move feet or body sideways: the Dog's paws glide, the
+  Salamander bends its spine, the Spider's fanned legs already push sideways.
+- **Steering with heading hold.** `heading = hold(yaw, steer != 0)` remembers
+  where the robot pointed when the keys were released, and
+  `atan2(sin(heading - yaw), cos(heading - yaw))` is the error to steer by.
 
 ## Blueprints and the code API
 
@@ -197,15 +227,15 @@ console.log(robot.jointPosition('swing'), robot.worstConnection());
 
 ## Tests
 
-`npm test` runs Vitest suites (about 12 s):
+`npm test` runs Vitest suites (about 35 s):
 
 - **parts** — every snap point lies on its part's surface, with an outward unit normal and a perpendicular up.
 - **assembly** — every part type snaps onto every other at every pair of snap points (over 1,000 combinations) with zero gap and opposed normals; turning, starting poses, long chains, spawning on the ground.
 - **blueprint** — validation catches duplicate ids, unknown parts/snaps/joints/DOFs, a snap used twice, two parents, loops, disconnected parts, bad limits, broken formulas and circular channels; JSON round-trips.
 - **edit** — building a walker click by click through the same operations the UI uses.
 - **signals / brain** — the expression language, waves, keyboard modes, channels, overrides.
-- **physics-joints** — in Rapier, every joint type stays connected (sub-millimetre, sub-degree) while being thrown around and respects its limits; free joints swing, springs return, servos track, motors spin, strength limits bind, logic can read other joints, overlapping parts ignore each other, live retuning works.
-- **scenarios** — the dog and hexapod walk forward without falling over (the dog for any solver quality from 8 to 16 iterations), the rover drives and turns on the right keys, the snake's motion comes from its wave, the arm jogs and holds, the pendulum conserves energy.
+- **physics-joints** — in Rapier, every joint type stays connected (sub-millimetre, sub-degree) while being thrown around and respects its limits; free joints swing, springs return, servos track, motors spin, strength limits bind, logic can read other joints, overlapping parts ignore each other, live retuning works; touch sensors count only real contact; wheels roll without hopping and the ground follows robots that travel far.
+- **scenarios** — the dog trots off, steers both ways and holds its new heading, backs up, stops and restarts on Space and keeps its feet when poked, for any solver quality from 8 to 16 iterations; the spider walks on its feet alone in two alternating groups of four legs, steers and spins on the spot; the salamander owes much of its speed to its body wave and stalls when the wave is mistimed; the balancer stays up only with its feedback loop, drives, turns and catches a shove to the head; the hexapod walks, the rover drives and turns on the right keys, the snake's motion comes from its wave, the arm jogs and holds, the pendulum conserves energy.
 
 ## How it is put together
 
@@ -227,7 +257,7 @@ src/
                    joint (free axes = the DOFs), joint motors for drives
   render/        three.js: viewport, part meshes, joint gizmos, snap markers
   ui/            panels, inspector, signal editor, scope; App.ts wires it all up
-  presets/       the example robots
+  presets/       the example robots (walker.ts: the steering brain the walkers share)
 tests/           Vitest suites
 ```
 
@@ -235,4 +265,11 @@ Physics notes: the world steps at 240 Hz with 12 solver iterations. Each
 joint's two local frames are exactly the frames from the assembly, so a DOF
 reading of zero always means "as snapped together". Servos use Rapier's implicit
 PD motors (stable at high stiffness) with a torque cap; free joints use a
-zero-speed velocity motor as viscous friction.
+zero-speed velocity motor as viscous friction. Rapier pushes each driven axis of
+a multi-axis joint about the parent's fixed axis, which stops matching the
+measured angle once the joint is bent, and it does not carry joint impulses over
+from one step to the next — so such a joint holds much less firmly than a hinge
+when it is bent and loaded (see *Making a walker work*). The ground is a 40 m slab that slides along under
+the robots: against a much larger box Rapier's contacts dip by millimetres,
+enough to make a slowly rolling wheel hop. `touching()` counts contact within
+3 mm, because Rapier also reports predicted contacts centimetres away.

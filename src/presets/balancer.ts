@@ -22,7 +22,7 @@ export function balancer(): Blueprint {
   const wheel = { type: 'wheel' as const, size: { radius: 0.12, thickness: 0.05 } };
   const motor = (expr: string) => ({ spin: { drive: { mode: 'motor' as const, gain: 20, maxForce: 15, signal: { kind: 'expression' as const, expr } } } });
   const b = new RobotBuilder('Balancer', 'Two-wheeled inverted pendulum that balances itself with a feedback loop on its pitch sensor.')
-    .root('chassis', 'block', { size: { x: 0.2, y: 0.08, z: 0.08 }, density: 500, color: '#495057' })
+    .root('chassis', 'block', { size: { x: 0.26, y: 0.08, z: 0.08 }, density: 500, color: '#495057' })
     .channel('lean', { kind: 'expression', expr: '-pitch' })
     .channel('cruise', { kind: 'expression', expr: 'smooth(0.6 * clamp(axis("up", "down") + axis("w", "s"), -1, 1), 0.6)' })
     .channel('aim', { kind: 'expression', expr: 'clamp(0.15 * (cruise - forward) + 0.1 * integrate(cruise - forward, -1, 1), -0.15, 0.15)' })
@@ -33,7 +33,7 @@ export function balancer(): Blueprint {
     .attach('axle_l', 'wheel', 'chassis.left', { id: 'wheel_l', ...wheel }, { dofs: motor('drive - steer') })
     .attach('axle_r', 'wheel', 'chassis.right', { id: 'wheel_r', ...wheel }, { dofs: motor('-(drive + steer)') })
     .attach('waist', 'weld', 'chassis.top', { id: 'body', type: 'block', size: { x: 0.11, y: 0.2, z: 0.07 }, density: 400, color: '#e9c46a' })
-    .attach('collar', 'weld', 'body.top', { id: 'shoulders', type: 'plate', size: { width: 0.4, thickness: 0.03, length: 0.08 }, density: 250, color: '#2a9d8f' })
+    .attach('collar', 'weld', 'body.top', { id: 'shoulders', type: 'plate', size: { width: 0.46, thickness: 0.03, length: 0.08 }, density: 250, color: '#2a9d8f' })
     .attach('neck', 'weld', 'shoulders.top', { id: 'head', type: 'sphere', size: { radius: 0.06 }, density: 800, color: '#264653' })
     .attach('face', 'weld', 'head.front', { id: 'visor', type: 'block', snap: 'back', size: { x: 0.07, y: 0.025, z: 0.015 }, density: 300, color: '#90e0ef' });
   for (const [side, corner] of [['l', 'bottom_fl'], ['r', 'bottom_fr']] as const) {

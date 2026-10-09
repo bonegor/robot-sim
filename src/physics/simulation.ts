@@ -32,7 +32,7 @@ import {
   v3,
   wrapAngle,
 } from '../core/math';
-import type { Shape } from '../core/parts';
+import { type Shape, shapeVolume } from '../core/parts';
 import { type Rapier, loadRapier } from './rapier';
 
 type World = RAPIER_NS.World;
@@ -293,7 +293,11 @@ export class Robot implements BrainSenses {
         .setTranslation(part.pose.p.x, part.pose.p.y, part.pose.p.z)
         .setRotation(part.pose.q);
       const body = world.createRigidBody(desc);
-      const cdesc = colliderDesc(R, part.shape).setDensity(part.density).setFriction(part.friction);
+      const cdesc = colliderDesc(R, part.shape).setFriction(part.friction);
+      // Rapier leaves the rounded rim of a wheel out of its mass (40% of it
+      // for a stock wheel), so rounded shapes get their mass set directly.
+      if (part.shape.kind === 'cylinder' && part.shape.rounding) cdesc.setMass(part.density * shapeVolume(part.shape));
+      else cdesc.setDensity(part.density);
       if (groups !== null) cdesc.setCollisionGroups(groups);
       const collider = world.createCollider(cdesc, body);
       this.ownColliders.add(collider.handle);

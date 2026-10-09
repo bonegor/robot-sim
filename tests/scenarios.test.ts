@@ -349,7 +349,7 @@ describe('balancer', () => {
   });
 
   it('catches itself when its head is given an app-strength shove', async () => {
-    for (const direction of [v3(0, 0.2, 1), v3(0, 0.2, -1), v3(0.7, 0.2, 0.7)]) {
+    for (const direction of [v3(0, 0.2, 1), v3(0, 0.2, -1), v3(1, 0.2, 0), v3(0.7, 0.2, 0.7)]) {
       const robot = await spawn(balancer());
       run(robot, 2);
       const strength = 0.6 * robot.totalMass();

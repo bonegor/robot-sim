@@ -8,6 +8,7 @@ import type { Blueprint, DofSpec } from '../src/core/blueprint';
 import { RobotBuilder } from '../src/core/builder';
 import type { SignalSpec } from '../src/core/signals';
 import { JOINT_TYPE_LIST, type JointType } from '../src/core/joints';
+import { PART_TYPE_LIST, shapeVolume } from '../src/core/parts';
 import { type Robot, Simulation } from '../src/physics/simulation';
 
 let sim: Simulation | null = null;
@@ -301,6 +302,15 @@ describe('building', () => {
     run(robot, 1);
     expect(robot.touching('foot')).toBe(true);
     expect(robot.touching('hat')).toBe(false);
+  });
+
+  it('every part weighs its volume times its density', async () => {
+    sim = await Simulation.create({ ground: false, gravity: 0 });
+    for (const def of PART_TYPE_LIST) {
+      const robot = sim.addRobot(new RobotBuilder(def.type).root('p', def.type, { density: 700 }).spawn({ position: { x: 0, y: 1, z: 0 } }).build());
+      const part = robot.parts.get('p')!;
+      expect(part.body.mass(), def.type).toBeCloseTo(700 * shapeVolume(part.asm.shape), 6);
+    }
   });
 
   it('touch sensors ignore parts that are merely close to the ground', async () => {

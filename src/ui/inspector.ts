@@ -5,7 +5,7 @@
  */
 import type { Assembly } from '../core/assembly';
 import { type Blueprint, type ValidationResult, blueprintScope, usedSnaps } from '../core/blueprint';
-import { DRIVE_MODES, type DriveMode, resolveDrive } from '../core/drives';
+import { DRIVE_MODES, type DriveMode, isDriven, resolveDrive } from '../core/drives';
 import { changeJointType, jointSpec, parentJointOf, partSpec, removePart, setChannel, setDriveMode, setPartSize, setSignal, updateDof, updateDrive, updateJoint, updatePart } from '../core/edit';
 import { RESERVED_NAMES } from '../core/expression';
 import { type DofDef, JOINT_TYPE_LIST, type JointType, getJointType } from '../core/joints';
@@ -342,8 +342,17 @@ function partPanel(ctx: InspectorContext, partId: string): HTMLElement[] {
       ),
     );
     out.push(connection);
-    if (jdef.dofs.length) out.push(section(jdef.dofs.length > 1 ? 'Degrees of freedom' : 'Motion', ...jdef.dofs.map((d) => dofCard(ctx, j.id, d))));
-    else out.push(section('Motion', h('p', { class: 'muted' }, 'A weld has no motion: the two parts act as one.')));
+    if (jdef.dofs.length) {
+      const cards = jdef.dofs.map((d) => dofCard(ctx, j.id, d));
+      // The physics engine solves several driven rotation axes of one joint
+      // together; bent and loaded, they hold far less firmly than a hinge.
+      const rotations = jdef.dofs.filter((d) => d.kind === 'angular');
+      const driven = rotations.some((d) => isDriven(resolveDrive(j.dofs?.[d.name]?.drive, d, jdef.defaultDrive).mode));
+      if (rotations.length > 1 && driven) {
+        cards.push(h('p', { class: 'hint' }, 'Tip: servos on a joint with several rotation axes go soft when it is bent and carrying weight. For legs, chain single-axis hinges instead (turn one a quarter turn to swing sideways), like the Dog, Spider and Salamander.'));
+      }
+      out.push(section(jdef.dofs.length > 1 ? 'Degrees of freedom' : 'Motion', ...cards));
+    } else out.push(section('Motion', h('p', { class: 'muted' }, 'A weld has no motion: the two parts act as one.')));
   } else {
     out.push(section('Connection', h('p', { class: 'muted' }, 'This is the root part: everything else hangs off it.')));
   }
