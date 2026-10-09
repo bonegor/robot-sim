@@ -174,9 +174,10 @@ describe('blueprint helpers', () => {
 
 describe('keysUsed', () => {
   it('lists the keys a robot listens to, from keyboard signals and logic', async () => {
-    const { rover, arm, dog } = await import('../src/presets');
+    const { rover, arm, dog, hexapod } = await import('../src/presets');
     expect(keysUsed(rover()).sort()).toEqual(['A', 'D', 'S', 'W', '↑', '↓', '←', '→'].sort());
     expect(keysUsed(arm())).toEqual(expect.arrayContaining(['Q', 'E', 'W', 'S', 'A', 'D', 'Z', 'X', 'C', 'V']));
-    expect(keysUsed(dog())).toEqual([]);
+    expect(keysUsed(dog()).sort()).toEqual(['A', 'D', 'S', 'W', 'Space', '↑', '↓', '←', '→'].sort());
+    expect(keysUsed(hexapod())).toEqual([]);
   });
 });

@@ -54,6 +54,11 @@ const LOCK_BIT: Record<DofAxis, number> = { linX: 1, linY: 2, linZ: 4, angX: 8, 
 const ALL_AXES = 63;
 /** Allowed penetration between non-adjacent parts at spawn before they stop colliding with each other. */
 const OVERLAP_TOLERANCE = 0.002;
+/**
+ * Gap (m) under which a contact point counts as touching. Rapier also reports
+ * predicted contacts several centimetres away, so the distance must be checked.
+ */
+const TOUCH_DISTANCE = 0.003;
 
 export interface SimulationOptions {
   /** Physics step in seconds (default 1/240). */
@@ -482,7 +487,7 @@ export class Robot implements BrainSenses {
       this.sim.world.contactPairsWith(part.collider, (other) => {
         if (touching || this.ownColliders.has(other.handle)) return;
         this.sim.world.contactPair(part.collider, other, (manifold) => {
-          if (manifold.numContacts() > 0) touching = true;
+          for (let i = 0; i < manifold.numContacts() && !touching; i++) touching = manifold.contactDist(i) <= TOUCH_DISTANCE;
         });
       });
     }

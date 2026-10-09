@@ -303,6 +303,24 @@ describe('building', () => {
     expect(robot.touching('hat')).toBe(false);
   });
 
+  it('touch sensors ignore parts that are merely close to the ground', async () => {
+    // Four feet hold the plate up; the belly ball hangs 1.5 cm short of the floor.
+    const b = new RobotBuilder('belly').root('body', 'plate');
+    for (const corner of ['fl', 'fr', 'bl', 'br']) b.attach(`leg_${corner}`, 'weld', `body.bottom_${corner}`, { id: `foot_${corner}`, type: 'sphere' });
+    b.attach('belly_joint', 'weld', 'body.bottom', { id: 'belly', type: 'sphere', size: { radius: 0.0425 } });
+    sim = await Simulation.create();
+    const robot = sim.addRobot(b.build());
+    let belly = 0;
+    let feet = 0;
+    const steps = run(robot, 1, () => {
+      if (robot.touching('belly')) belly++;
+      if (robot.touching('foot_fl')) feet++;
+    });
+    expect(steps.gap).toBeLessThan(1e-3);
+    expect(feet).toBeGreaterThan(200);
+    expect(belly).toBe(0);
+  });
+
   it('self-collision can be switched off', async () => {
     // An arm hanging under the base swings forward into a wall that hangs off the base's front face.
     const build = (selfCollision: boolean) =>

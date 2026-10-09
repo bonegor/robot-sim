@@ -6,6 +6,8 @@ import { hexapod } from './hexapod';
 import { pendulum } from './pendulum';
 import { rover } from './rover';
 import { snake } from './snake';
+import { spider } from './spider';
+import { WALKER_CONTROLS } from './walker';
 
 export interface Preset {
   id: string;
@@ -24,7 +26,20 @@ export function starter(): Blueprint {
 }
 
 export const PRESETS: readonly Preset[] = [
-  { id: 'dog', name: 'Dog', summary: 'Trotting quadruped. Legs follow phase-shifted waves; the tail is springy.', build: () => dog() },
+  {
+    id: 'dog',
+    name: 'Dog',
+    summary: 'Steerable trotting quadruped: a shared gait clock, sliding paws to turn, balance reflexes and a springy tail.',
+    controls: WALKER_CONTROLS,
+    build: () => dog(),
+  },
+  {
+    id: 'spider',
+    name: 'Spider',
+    summary: 'Eight-legged arachnid walking an alternating tetrapod gait; it can spin on the spot.',
+    controls: WALKER_CONTROLS,
+    build: () => spider(),
+  },
   { id: 'hexapod', name: 'Hexapod', summary: 'Six legs, tripod gait. Each hip is a two-axis saddle joint.', build: () => hexapod() },
   { id: 'rover', name: 'Rover', summary: 'Four wheel motors mixed from the keyboard.', controls: 'Arrow keys / WASD to drive', build: () => rover() },
   { id: 'snake', name: 'Snake', summary: 'A travelling wave down a chain of hinges, on free-spinning wheels.', build: () => snake() },
@@ -43,4 +58,4 @@ export function presetById(id: string): Preset | undefined {
   return PRESETS.find((p) => p.id === id);
 }
 
-export { arm, dog, hexapod, pendulum, rover, snake };
+export { arm, dog, hexapod, pendulum, rover, snake, spider };

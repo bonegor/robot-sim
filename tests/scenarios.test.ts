@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { validateBlueprint } from '../src/core/blueprint';
 import { qrotate, v3 } from '../src/core/math';
-import { PRESETS, arm, dog, hexapod, pendulum, rover, snake } from '../src/presets';
+import { PRESETS, arm, dog, hexapod, pendulum, rover, snake, spider } from '../src/presets';
 import { type Robot, Simulation } from '../src/physics/simulation';
 import type { Blueprint } from '../src/core/blueprint';
 
@@ -57,14 +57,27 @@ describe('presets', () => {
   }
 });
 
+/** Total change of heading (rad, left positive) while running, unwrapped. */
+function runTurning(robot: Robot, seconds: number, each?: (t: number) => void): RunStats & { turned: number } {
+  let turned = 0;
+  let last = robot.bodySensor('yaw');
+  const stats = run(robot, seconds, (t) => {
+    const yaw = robot.bodySensor('yaw');
+    turned += Math.atan2(Math.sin(yaw - last), Math.cos(yaw - last));
+    last = yaw;
+    each?.(t);
+  });
+  return { ...stats, turned };
+}
+
 describe('dog', () => {
   it('trots forward without falling over and its joints stay connected', async () => {
     const robot = await spawn(dog());
     const stats = run(robot, 10);
     const t = robot.telemetry();
-    expect(t.forwardDistance).toBeGreaterThan(1.5);
-    expect(Math.abs(t.distance - t.forwardDistance)).toBeLessThan(0.5); // mostly straight
-    expect(stats.maxTilt).toBeLessThan(30 * DEG);
+    expect(t.forwardDistance).toBeGreaterThan(5);
+    expect(Math.abs(t.distance - t.forwardDistance)).toBeLessThan(0.3); // straight: it holds its heading
+    expect(stats.maxTilt).toBeLessThan(20 * DEG);
     expect(stats.maxGap).toBeLessThan(3e-3);
     expect(stats.maxAngle).toBeLessThan(0.1);
   });
@@ -73,11 +86,60 @@ describe('dog', () => {
     for (const iterations of [8, 16]) {
       const robot = await spawn(dog(), iterations);
       const stats = run(robot, 8);
-      expect(robot.telemetry().forwardDistance, `${iterations} iterations`).toBeGreaterThan(0.8);
-      expect(stats.maxTilt).toBeLessThan(45 * DEG);
+      expect(robot.telemetry().forwardDistance, `${iterations} iterations`).toBeGreaterThan(3.5);
+      expect(stats.maxTilt).toBeLessThan(30 * DEG);
       sim!.dispose();
       sim = null;
     }
+  });
+
+  it('turns left and right on the arrow keys, then holds the new heading', async () => {
+    for (const [key, direction] of [['ArrowLeft', 1], ['KeyD', -1]] as const) {
+      const robot = await spawn(dog());
+      run(robot, 1);
+      robot.sim.keys.add(key);
+      const turning = runTurning(robot, 3);
+      robot.sim.keys.clear();
+      expect(direction * turning.turned, key).toBeGreaterThan(90 * DEG);
+      expect(turning.maxTilt, key).toBeLessThan(25 * DEG);
+      const settled = runTurning(robot, 1);
+      const holding = runTurning(robot, 3);
+      expect(Math.abs(settled.turned) + Math.abs(holding.turned), key).toBeLessThan(25 * DEG);
+      sim!.dispose();
+      sim = null;
+    }
+  });
+
+  it('backs up on ↓ and stops and restarts on Space', async () => {
+    const robot = await spawn(dog());
+    robot.sim.keys.add('ArrowDown');
+    run(robot, 6);
+    expect(robot.telemetry().forwardDistance).toBeLessThan(-1);
+    robot.sim.keys.clear();
+    robot.sim.keys.add('Space');
+    run(robot, 0.1);
+    robot.sim.keys.clear();
+    run(robot, 2);
+    const stopped = robot.partPose('torso').p;
+    run(robot, 3);
+    const p = robot.partPose('torso').p;
+    expect(Math.hypot(p.x - stopped.x, p.z - stopped.z)).toBeLessThan(0.15);
+    robot.sim.keys.add('Space');
+    run(robot, 0.1);
+    robot.sim.keys.clear();
+    run(robot, 3);
+    const q = robot.partPose('torso').p;
+    expect(Math.hypot(q.x - p.x, q.z - p.z)).toBeGreaterThan(1);
+  });
+
+  it('keeps its feet when poked from the side', async () => {
+    const robot = await spawn(dog());
+    run(robot, 3);
+    // About as hard as a click in the app: 0.6 N·s per kg.
+    robot.applyImpulse('torso', v3(0.6 * robot.totalMass(), 0.5, 0));
+    const stats = run(robot, 4);
+    expect(stats.maxTilt).toBeLessThan(45 * DEG);
+    expect(robot.telemetry().tilt).toBeLessThan(15 * DEG);
   });
 
   it('stands still when the gait is switched off', async () => {
@@ -100,6 +162,102 @@ describe('dog', () => {
     const seen = new Set<number>();
     run(robot, 3, () => seen.add(Math.round(robot.jointPosition('tail_tip', 'bend') * 100)));
     expect(seen.size).toBeGreaterThan(5);
+  });
+});
+
+describe('spider', () => {
+  const feet = ['l1', 'l2', 'l3', 'l4', 'r1', 'r2', 'r3', 'r4'].map((leg) => `tibia_${leg}`);
+
+  it('walks forward on its feet alone, with its joints connected', async () => {
+    const robot = await spawn(spider());
+    let othersTouching = 0;
+    const stats = run(robot, 10, (t) => {
+      if (t < 1) return;
+      for (const id of robot.parts.keys()) if (!feet.includes(id) && robot.touching(id)) othersTouching++;
+    });
+    const t = robot.telemetry();
+    expect(t.forwardDistance).toBeGreaterThan(3);
+    expect(Math.abs(t.distance - t.forwardDistance)).toBeLessThan(0.3);
+    expect(stats.maxTilt).toBeLessThan(20 * DEG);
+    expect(stats.maxGap).toBeLessThan(5e-3);
+    expect(othersTouching).toBe(0); // no belly or abdomen dragging along
+  });
+
+  it('walks for any solver quality between 8 and 16 iterations', async () => {
+    for (const iterations of [8, 16]) {
+      const robot = await spawn(spider(), iterations);
+      const stats = run(robot, 8);
+      expect(robot.telemetry().forwardDistance, `${iterations} iterations`).toBeGreaterThan(2);
+      expect(stats.maxTilt).toBeLessThan(25 * DEG);
+      sim!.dispose();
+      sim = null;
+    }
+  });
+
+  it('steps in two alternating groups of four legs', async () => {
+    const robot = await spawn(spider());
+    run(robot, 2);
+    // Sample the targets of the hips over one gait cycle: legs in the same
+    // group (L1 R2 L3 R4 / R1 L2 R3 L4) swing back and forth together.
+    const swing = (leg: string) => robot.dofs.get(`hip_${leg}.bend`)!;
+    const lastTarget = new Map<string, number>();
+    const direction = (leg: string) => {
+      const s = swing(leg);
+      const previous = lastTarget.get(leg) ?? s.target!;
+      lastTarget.set(leg, s.target!);
+      // Map the right side onto the left (its hips swing the other way round).
+      return Math.sign(s.target! - previous) * (leg.startsWith('l') ? 1 : -1);
+    };
+    let agree = 0;
+    let disagree = 0;
+    run(robot, 1 / 1.6, () => {
+      const a = ['l1', 'r2', 'l3', 'r4'].map(direction);
+      const b = ['r1', 'l2', 'r3', 'l4'].map(direction);
+      if (a.every((d) => d === a[0]) && b.every((d) => d === b[0]) && a[0] !== 0) {
+        if (a[0] === b[0]) disagree++;
+        else agree++;
+      }
+    });
+    expect(agree).toBeGreaterThan(100);
+    expect(disagree).toBe(0);
+  });
+
+  it('turns both ways and spins on the spot when stopped', async () => {
+    for (const [key, direction] of [['ArrowLeft', 1], ['ArrowRight', -1]] as const) {
+      const robot = await spawn(spider());
+      run(robot, 1);
+      robot.sim.keys.add(key);
+      const turning = runTurning(robot, 3);
+      expect(direction * turning.turned, key).toBeGreaterThan(90 * DEG);
+      expect(turning.maxTilt, key).toBeLessThan(25 * DEG);
+      sim!.dispose();
+      sim = null;
+    }
+    const robot = await spawn(spider());
+    robot.sim.keys.add('Space');
+    run(robot, 0.1);
+    robot.sim.keys.clear();
+    run(robot, 1.5);
+    const start = robot.partPose('prosoma').p;
+    robot.sim.keys.add('KeyA');
+    const spin = runTurning(robot, 3);
+    const end = robot.partPose('prosoma').p;
+    expect(spin.turned).toBeGreaterThan(120 * DEG);
+    expect(Math.hypot(end.x - start.x, end.z - start.z)).toBeLessThan(0.3);
+  });
+
+  it('bobs its springy abdomen while it walks', async () => {
+    const robot = await spawn(spider());
+    expect(robot.dofs.get('waist.bend')!.config.drive.mode).toBe('spring');
+    let lo = Infinity;
+    let hi = -Infinity;
+    run(robot, 4, (t) => {
+      if (t < 1) return;
+      const p = robot.jointPosition('waist');
+      lo = Math.min(lo, p);
+      hi = Math.max(hi, p);
+    });
+    expect(hi - lo).toBeGreaterThan(0.02);
   });
 });
 
