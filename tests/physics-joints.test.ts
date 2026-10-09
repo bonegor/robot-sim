@@ -9,6 +9,7 @@ import { RobotBuilder } from '../src/core/builder';
 import type { SignalSpec } from '../src/core/signals';
 import { JOINT_TYPE_LIST, type JointType } from '../src/core/joints';
 import { PART_TYPE_LIST, shapeVolume } from '../src/core/parts';
+import { spawnRootPose } from '../src/core/assembly';
 import { type Robot, Simulation } from '../src/physics/simulation';
 
 let sim: Simulation | null = null;
@@ -383,6 +384,20 @@ describe('the ground', () => {
     run(robot, 30);
     expect(robot.telemetry().forwardDistance).toBeGreaterThan(30);
     expect(robot.telemetry().height).toBeCloseTo(height, 2);
+  });
+
+  it('stays under robots that drive away from each other', async () => {
+    sim = await Simulation.create();
+    const out = sim.addRobot(cart(12));
+    const reverse = cart(-12);
+    const beside = spawnRootPose(reverse);
+    const back = sim.addRobot(reverse, { rootPose: { ...beside, p: { ...beside.p, x: beside.p.x + 2 } } });
+    run(out, 1);
+    const heights = [out.telemetry().height, back.telemetry().height];
+    run(out, 25);
+    expect(out.telemetry().forwardDistance - back.telemetry().forwardDistance).toBeGreaterThan(50);
+    expect(out.telemetry().height).toBeCloseTo(heights[0]!, 2);
+    expect(back.telemetry().height).toBeCloseTo(heights[1]!, 2);
   });
 });
 

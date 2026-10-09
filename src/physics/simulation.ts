@@ -135,6 +135,7 @@ export class Simulation {
   groundCollider: Collider | null = null;
 
   private groundBody: RigidBody | null = null;
+  private groundHalfSize = GROUND_HALF_SIZE;
   private readonly excluded = new Set<string>();
   private readonly hooks: RAPIER_NS.PhysicsHooks;
   private readonly controllers: ((sim: Simulation, dt: number) => void)[] = [];
@@ -205,16 +206,30 @@ export class Simulation {
     for (const r of this.robots) r.sense(dt);
   }
 
-  /** Slides the ground slab under the robots; its surface stays at y = 0, so nothing standing on it notices. */
+  /**
+   * Slides the ground slab under the robots, and widens it when they spread
+   * out; its surface stays at y = 0, so nothing standing on it notices.
+   */
   private keepGroundUnderRobots(): void {
     const ground = this.groundBody;
-    if (!ground || this.robots.length === 0) return;
-    let x = 0;
-    let z = 0;
+    if (!ground || !this.groundCollider || this.robots.length === 0) return;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
     for (const r of this.robots) {
       const p = r.rootPose().p;
-      x += p.x / this.robots.length;
-      z += p.z / this.robots.length;
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minZ = Math.min(minZ, p.z);
+      maxZ = Math.max(maxZ, p.z);
+    }
+    const x = (minX + maxX) / 2;
+    const z = (minZ + maxZ) / 2;
+    const half = Math.max(GROUND_HALF_SIZE, (Math.max(maxX - minX, maxZ - minZ) / 2) + GROUND_HALF_SIZE - GROUND_RECENTER);
+    if (half > this.groundHalfSize) {
+      this.groundHalfSize = half;
+      this.groundCollider.setHalfExtents({ x: half, y: 0.5, z: half });
     }
     const at = ground.translation();
     if (Math.abs(x - at.x) > GROUND_RECENTER || Math.abs(z - at.z) > GROUND_RECENTER) ground.setTranslation({ x, y: at.y, z }, false);

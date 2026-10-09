@@ -24,8 +24,8 @@ const num = (x: number): string => Number(x.toFixed(4)).toString();
  * pairs backward.
  *
  * Gait: alternating tetrapod, as spiders walk. Legs L1 R2 L3 R4 step
- * together, then R1 L2 R3 L4, so four feet always hold the body.
- *   hip  = fan + stride · sine(gait + phase)        (the foot moves back while it is down)
+ * together, then R1 L2 R3 L4, so one group of four is always pushing.
+ *   hip  = fan ± stride · sine(gait + phase)        (the foot moves back while it is down; mirrored on the right)
  *   knee = droop − lift · pulse(gait + phase − ¼)   (the knee straightens to lift the foot as it swings forward)
  * Turning: the legs on one side stride shorter (or backwards) than the
  * other side's, so the spider can spin on the spot.
