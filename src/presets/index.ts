@@ -1,10 +1,12 @@
 import type { Blueprint } from '../core/blueprint';
 import { RobotBuilder } from '../core/builder';
 import { arm } from './arm';
+import { balancer } from './balancer';
 import { dog } from './dog';
 import { hexapod } from './hexapod';
 import { pendulum } from './pendulum';
 import { rover } from './rover';
+import { salamander } from './salamander';
 import { snake } from './snake';
 import { spider } from './spider';
 import { WALKER_CONTROLS } from './walker';
@@ -40,8 +42,22 @@ export const PRESETS: readonly Preset[] = [
     controls: WALKER_CONTROLS,
     build: () => spider(),
   },
+  {
+    id: 'salamander',
+    name: 'Salamander',
+    summary: 'Sprawling quadruped: its spine and tail swing in a wave locked to the steps, which lengthens its stride.',
+    controls: WALKER_CONTROLS,
+    build: () => salamander(),
+  },
   { id: 'hexapod', name: 'Hexapod', summary: 'Six legs, tripod gait. Each hip is a two-axis saddle joint.', build: () => hexapod() },
   { id: 'rover', name: 'Rover', summary: 'Four wheel motors mixed from the keyboard.', controls: 'Arrow keys / WASD to drive', build: () => rover() },
+  {
+    id: 'balancer',
+    name: 'Balancer',
+    summary: 'Two-wheeled inverted pendulum that keeps itself upright with a feedback loop on its pitch sensor.',
+    controls: '↑/↓ or W/S drive · ←/→ or A/D turn · click it to give it a shove',
+    build: () => balancer(),
+  },
   { id: 'snake', name: 'Snake', summary: 'A travelling wave down a chain of hinges, on free-spinning wheels.', build: () => snake() },
   {
     id: 'arm',
@@ -58,4 +74,4 @@ export function presetById(id: string): Preset | undefined {
   return PRESETS.find((p) => p.id === id);
 }
 
-export { arm, dog, hexapod, pendulum, rover, snake, spider };
+export { arm, balancer, dog, hexapod, pendulum, rover, salamander, snake, spider };

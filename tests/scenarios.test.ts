@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { validateBlueprint } from '../src/core/blueprint';
 import { qrotate, v3 } from '../src/core/math';
-import { PRESETS, arm, dog, hexapod, pendulum, rover, snake, spider } from '../src/presets';
+import { PRESETS, arm, balancer, dog, hexapod, pendulum, rover, salamander, snake, spider } from '../src/presets';
 import { type Robot, Simulation } from '../src/physics/simulation';
 import type { Blueprint } from '../src/core/blueprint';
 
@@ -258,6 +258,108 @@ describe('spider', () => {
       hi = Math.max(hi, p);
     });
     expect(hi - lo).toBeGreaterThan(0.02);
+  });
+});
+
+describe('salamander', () => {
+  it('walks forward on its sprawled legs with its joints connected', async () => {
+    const robot = await spawn(salamander());
+    const stats = run(robot, 10);
+    expect(robot.telemetry().forwardDistance).toBeGreaterThan(2.5);
+    expect(stats.maxTilt).toBeLessThan(25 * DEG);
+    expect(stats.maxGap).toBeLessThan(5e-3);
+  });
+
+  it('owes much of its speed to the body wave, and stalls when the wave is mistimed', async () => {
+    const travel = async (bp: Blueprint) => {
+      const robot = await spawn(bp);
+      run(robot, 8);
+      const d = robot.telemetry().forwardDistance;
+      sim!.dispose();
+      sim = null;
+      return d;
+    };
+    const waving = await travel(salamander());
+    expect(waving).toBeGreaterThan(1.25 * (await travel(salamander({ wave: 0 }))));
+    expect(await travel(salamander({ wavePhase: 0 }))).toBeLessThan(0.3 * waving);
+  });
+
+  it('steers both ways, backs up, and walks for 8 to 16 solver iterations', async () => {
+    for (const [key, direction] of [['ArrowLeft', 1], ['KeyD', -1]] as const) {
+      const robot = await spawn(salamander());
+      run(robot, 1);
+      robot.sim.keys.add(key);
+      expect(direction * runTurning(robot, 3).turned, key).toBeGreaterThan(45 * DEG);
+      sim!.dispose();
+      sim = null;
+    }
+    const robot = await spawn(salamander());
+    robot.sim.keys.add('ArrowDown');
+    run(robot, 6);
+    expect(robot.telemetry().forwardDistance).toBeLessThan(-1);
+    sim!.dispose();
+    sim = null;
+    for (const iterations of [8, 16]) {
+      const r = await spawn(salamander(), iterations);
+      const stats = run(r, 8);
+      expect(r.telemetry().forwardDistance, `${iterations} iterations`).toBeGreaterThan(1.5);
+      expect(stats.maxTilt).toBeLessThan(30 * DEG);
+      sim!.dispose();
+      sim = null;
+    }
+  });
+});
+
+describe('balancer', () => {
+  it('balances on two wheels without being told anything', async () => {
+    const robot = await spawn(balancer());
+    const stats = run(robot, 20);
+    expect(stats.maxTilt).toBeLessThan(10 * DEG);
+    expect(robot.telemetry().distance).toBeLessThan(0.6);
+    expect(robot.touching('wheel_l') && robot.touching('wheel_r')).toBe(true);
+  });
+
+  it('falls over at once without its feedback loop', async () => {
+    const bp = balancer();
+    bp.channels!.drive = { kind: 'constant', value: 0 };
+    const robot = await spawn(bp);
+    // Start it leaning a little; with the wheels held still nothing catches it.
+    robot.applyImpulse('head', v3(0, 0, 0.2));
+    const stats = run(robot, 3);
+    expect(stats.maxTilt).toBeGreaterThan(60 * DEG);
+  });
+
+  it('drives on ↑/↓ and turns on ←/→ while staying upright', async () => {
+    let robot = await spawn(balancer());
+    robot.sim.keys.add('ArrowUp');
+    let stats = run(robot, 4);
+    expect(robot.telemetry().forwardDistance).toBeGreaterThan(1.5);
+    expect(stats.maxTilt).toBeLessThan(15 * DEG);
+    robot.sim.keys.clear();
+    robot.sim.keys.add('KeyS');
+    run(robot, 6);
+    expect(robot.telemetry().forwardDistance).toBeLessThan(0);
+    sim!.dispose();
+    sim = null;
+    robot = await spawn(balancer());
+    robot.sim.keys.add('ArrowLeft');
+    const turning = runTurning(robot, 2);
+    expect(turning.turned).toBeGreaterThan(60 * DEG);
+    expect(turning.maxTilt).toBeLessThan(10 * DEG);
+  });
+
+  it('catches itself when its head is given an app-strength shove', async () => {
+    for (const direction of [v3(0, 0.2, 1), v3(0, 0.2, -1), v3(0.7, 0.2, 0.7)]) {
+      const robot = await spawn(balancer());
+      run(robot, 2);
+      const strength = 0.6 * robot.totalMass();
+      robot.applyImpulse('head', v3(direction.x * strength, direction.y * strength, direction.z * strength), robot.partPose('head').p);
+      const stats = run(robot, 5);
+      expect(stats.maxTilt, JSON.stringify(direction)).toBeLessThan(60 * DEG);
+      expect(robot.telemetry().tilt).toBeLessThan(10 * DEG);
+      sim!.dispose();
+      sim = null;
+    }
   });
 });
 

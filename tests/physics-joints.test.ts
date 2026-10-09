@@ -343,6 +343,39 @@ describe('building', () => {
   });
 });
 
+describe('the ground', () => {
+  /** A four-wheeled cart whose axles turn at a fixed speed (rad/s). */
+  const cart = (speed: number): Blueprint => {
+    const b = new RobotBuilder('cart').root('chassis', 'plate');
+    const drive = (sign: number): Record<string, DofSpec> => ({ spin: { drive: { mode: 'motor', gain: 6, maxForce: 6, signal: constant(sign * speed) } } });
+    for (const [snap, sign] of [['left_front', 1], ['left_back', 1], ['right_front', -1], ['right_back', -1]] as const) {
+      b.attach(`axle_${snap}`, 'wheel', `chassis.${snap}`, { id: `wheel_${snap}`, type: 'wheel', size: { radius: 0.1, thickness: 0.05 } }, { dofs: drive(sign) });
+    }
+    return b.build();
+  };
+
+  it('wheels roll smoothly instead of hopping', async () => {
+    sim = await Simulation.create();
+    const robot = sim.addRobot(cart(3));
+    let wobble = 0;
+    run(robot, 5, () => {
+      if (robot.sim.time > 1) wobble = Math.max(wobble, Math.abs(robot.bodySensor('roll')), Math.abs(robot.bodySensor('pitch')));
+    });
+    expect(robot.telemetry().forwardDistance).toBeGreaterThan(1);
+    expect(wobble).toBeLessThan(0.2 * (Math.PI / 180));
+  });
+
+  it('stays under robots that travel far', async () => {
+    sim = await Simulation.create();
+    const robot = sim.addRobot(cart(12));
+    run(robot, 1);
+    const height = robot.telemetry().height;
+    run(robot, 30);
+    expect(robot.telemetry().forwardDistance).toBeGreaterThan(30);
+    expect(robot.telemetry().height).toBeCloseTo(height, 2);
+  });
+});
+
 describe('controlling robots from code and live tuning', () => {
   it('a controller written in code can read sensors and steer joints every step', async () => {
     // A "bang-bang" controller: swing the arm towards +0.6 rad until it gets there, then back to -0.6.

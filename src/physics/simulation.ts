@@ -59,6 +59,13 @@ const OVERLAP_TOLERANCE = 0.002;
  * predicted contacts several centimetres away, so the distance must be checked.
  */
 const TOUCH_DISTANCE = 0.003;
+/**
+ * Half the width of the ground slab (m), and how far the robots may wander
+ * from its centre before it moves under them again. Against a much larger box
+ * Rapier's contacts dip by millimetres, enough to make a wheel hop.
+ */
+const GROUND_HALF_SIZE = 20;
+const GROUND_RECENTER = 8;
 
 export interface SimulationOptions {
   /** Physics step in seconds (default 1/240). */
@@ -127,6 +134,7 @@ export class Simulation {
   time = 0;
   groundCollider: Collider | null = null;
 
+  private groundBody: RigidBody | null = null;
   private readonly excluded = new Set<string>();
   private readonly hooks: RAPIER_NS.PhysicsHooks;
   private readonly controllers: ((sim: Simulation, dt: number) => void)[] = [];
@@ -145,10 +153,10 @@ export class Simulation {
     this.world.timestep = this.timestep;
     this.world.numSolverIterations = options.solverIterations ?? 12;
     if (options.ground ?? true) {
-      const ground = this.world.createRigidBody(R.RigidBodyDesc.fixed());
+      this.groundBody = this.world.createRigidBody(R.RigidBodyDesc.fixed());
       this.groundCollider = this.world.createCollider(
-        R.ColliderDesc.cuboid(200, 0.5, 200).setTranslation(0, -0.5, 0).setFriction(options.groundFriction ?? 1),
-        ground,
+        R.ColliderDesc.cuboid(GROUND_HALF_SIZE, 0.5, GROUND_HALF_SIZE).setTranslation(0, -0.5, 0).setFriction(options.groundFriction ?? 1),
+        this.groundBody,
       );
     }
     const excluded = this.excluded;
@@ -191,9 +199,25 @@ export class Simulation {
     const dt = this.timestep;
     for (const c of this.controllers) c(this, dt);
     for (const r of this.robots) r.control(this.time, dt);
+    this.keepGroundUnderRobots();
     this.world.step(undefined, this.hooks);
     this.time += dt;
     for (const r of this.robots) r.sense(dt);
+  }
+
+  /** Slides the ground slab under the robots; its surface stays at y = 0, so nothing standing on it notices. */
+  private keepGroundUnderRobots(): void {
+    const ground = this.groundBody;
+    if (!ground || this.robots.length === 0) return;
+    let x = 0;
+    let z = 0;
+    for (const r of this.robots) {
+      const p = r.rootPose().p;
+      x += p.x / this.robots.length;
+      z += p.z / this.robots.length;
+    }
+    const at = ground.translation();
+    if (Math.abs(x - at.x) > GROUND_RECENTER || Math.abs(z - at.z) > GROUND_RECENTER) ground.setTranslation({ x, y: at.y, z }, false);
   }
 
   /** Runs whole steps covering `seconds` of simulated time. */
