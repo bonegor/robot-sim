@@ -1,6 +1,6 @@
 import type { Blueprint, DofSpec } from '../core/blueprint';
 import { RobotBuilder } from '../core/builder';
-import { walkerBrain } from './walker';
+import { num, walkerBrain } from './walker';
 
 export interface SpiderOptions {
   /** Steps per second. */
@@ -10,8 +10,6 @@ export interface SpiderOptions {
   /** How far the knees straighten to lift a foot (rad). */
   lift?: number;
 }
-
-const num = (x: number): string => Number(x.toFixed(4)).toString();
 
 /**
  * Arachnid: a cephalothorax (prosoma) carrying eight legs, a big abdomen

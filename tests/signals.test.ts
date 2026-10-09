@@ -132,6 +132,13 @@ describe('expression language', () => {
     rt.keys.delete('KeyW');
     rt.t = 5;
     expect(hold.evaluate(rt)).toBe(3);
+
+    // Before the condition is ever true, hold keeps x's first value.
+    const late = compileExpression('hold(t, key("w"))');
+    rt.t = 7;
+    expect(late.evaluate(rt)).toBe(7);
+    rt.t = 9;
+    expect(late.evaluate(rt)).toBe(7);
   });
 
   it('normalises friendly key names', () => {

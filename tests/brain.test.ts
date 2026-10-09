@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { assemble } from '../src/core/assembly';
 import { Brain, type BrainSenses } from '../src/core/brain';
+import { cloneBlueprint } from '../src/core/blueprint';
 import { RobotBuilder } from '../src/core/builder';
 
 const senses = (over: Partial<BrainSenses> = {}): BrainSenses => ({
@@ -47,6 +48,30 @@ describe('brain', () => {
     targets = brain.tick(0.01, 0.01, senses({ keyDown: (k) => k === 'ArrowUp', touching: (p) => p === 'l2' }));
     expect(targets.get('b.spin')).toBe(5);
     expect(targets.get('d.swing')).toBe(1);
+  });
+
+  it('hands the state of unchanged signals on to the brain that replaces it', () => {
+    const bp = robot();
+    bp.channels!.clock = { kind: 'expression', expr: 'integrate(1)' };
+    const first = new Brain(assemble(bp));
+    for (let i = 1; i <= 50; i++) first.tick(i * 0.01, 0.01, senses());
+    first.setOverride('b', 'spin', 2);
+
+    // Another gain on one joint: the clock keeps counting and the override stays.
+    const tuned = cloneBlueprint(bp);
+    tuned.joints.find((j) => j.id === 'a')!.dofs!.bend!.drive = { mode: 'servo', signal: { kind: 'channel', name: 'double', gain: 0.25 } };
+    const second = new Brain(assemble(tuned), first);
+    const targets = second.tick(0.51, 0.01, senses());
+    expect(second.channelValues().get('clock')).toBeCloseTo(0.51);
+    expect(targets.get('a.bend')).toBeCloseTo(0.25 * 2 * 0.51);
+    expect(targets.get('b.spin')).toBe(2);
+
+    // A channel that changed starts afresh.
+    const changed = cloneBlueprint(tuned);
+    changed.channels!.clock = { kind: 'expression', expr: 'integrate(2)' };
+    const third = new Brain(assemble(changed), second);
+    third.tick(0.52, 0.01, senses());
+    expect(third.channelValues().get('clock')).toBeCloseTo(0.02);
   });
 
   it('lets code override a signal and hand control back', () => {

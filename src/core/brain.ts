@@ -12,7 +12,7 @@ import type { Assembly } from './assembly';
 import { blueprintScope } from './blueprint';
 import { isDriven } from './drives';
 import type { BodySensorName, ExpressionRuntime } from './expression';
-import { type CompiledSignal, compileSignal } from './signals';
+import { type CompiledSignal, type SignalSpec, compileSignal } from './signals';
 
 export interface BrainSenses {
   keyDown(code: string): boolean;
@@ -40,22 +40,38 @@ export class Brain {
   private readonly computing = new Set<string>();
   private readonly overrides = new Map<string, number>();
   private readonly lastTargets = new Map<string, number>();
+  /** Every compiled signal by where it sits, with the settings it came from. */
+  private readonly compiled = new Map<string, { source: string; signal: CompiledSignal }>();
+  private readonly scopeKey: string;
 
-  constructor(assembly: Assembly) {
+  /**
+   * @param previous The brain this one replaces after a live edit. Signals
+   * whose settings did not change carry on where they were (gait clocks,
+   * toggles, filters), and so do overrides.
+   */
+  constructor(assembly: Assembly, previous?: Brain) {
     const bp = assembly.blueprint;
     const scope = blueprintScope(bp);
-    for (const [name, spec] of Object.entries(bp.channels ?? {})) this.channels.set(name, compileSignal(spec, scope));
+    // Names are looked up when a signal is compiled, so signals are only
+    // reused while the same names exist.
+    this.scopeKey = JSON.stringify([[...scope.channels].sort(), [...scope.joints].sort(), [...scope.parts].sort()]);
+    const kept = previous?.scopeKey === this.scopeKey ? previous.compiled : undefined;
+    const compile = (where: string, spec: SignalSpec): CompiledSignal => {
+      const source = JSON.stringify(spec);
+      const old = kept?.get(where);
+      const signal = old?.source === source ? old.signal : compileSignal(spec, scope);
+      this.compiled.set(where, { source, signal });
+      return signal;
+    };
+    for (const [name, spec] of Object.entries(bp.channels ?? {})) this.channels.set(name, compile(`channel ${name}`, spec));
     for (const [jointId, joint] of assembly.joints) {
       for (const dof of joint.dofs) {
         const { mode, signal } = dof.drive;
         if (!isDriven(mode) || !signal) continue;
-        this.driven.push({
-          key: dofKey(jointId, dof.def.name),
-          joint: jointId,
-          dof: dof.def.name,
-          mode: mode as 'servo' | 'motor',
-          signal: compileSignal(signal, scope),
-        });
+        const key = dofKey(jointId, dof.def.name);
+        this.driven.push({ key, joint: jointId, dof: dof.def.name, mode: mode as 'servo' | 'motor', signal: compile(key, signal) });
+        const override = previous?.overrides.get(key);
+        if (override !== undefined) this.overrides.set(key, override);
       }
     }
   }

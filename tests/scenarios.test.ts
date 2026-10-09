@@ -3,7 +3,7 @@
  * while every joint stays connected.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { validateBlueprint } from '../src/core/blueprint';
+import { cloneBlueprint, validateBlueprint } from '../src/core/blueprint';
 import { qrotate, v3 } from '../src/core/math';
 import { PRESETS, arm, balancer, dog, hexapod, pendulum, rover, salamander, snake, spider } from '../src/presets';
 import { type Robot, Simulation } from '../src/physics/simulation';
@@ -130,6 +130,26 @@ describe('dog', () => {
     run(robot, 3);
     const q = robot.partPose('torso').p;
     expect(Math.hypot(q.x - p.x, q.z - p.z)).toBeGreaterThan(1);
+  });
+
+  it('stays stopped when its settings are tuned while it runs', async () => {
+    const robot = await spawn(dog());
+    run(robot, 2);
+    robot.sim.keys.add('Space');
+    run(robot, 0.1);
+    robot.sim.keys.clear();
+    run(robot, 2);
+    // Stiffer hips, as if dragged on a slider in the inspector.
+    const tuned = cloneBlueprint(robot.blueprint);
+    for (const j of tuned.joints) {
+      const drive = j.dofs?.bend?.drive;
+      if (j.id.startsWith('hip_') && drive?.mode === 'servo') drive.stiffness = 400;
+    }
+    expect(robot.retune(tuned)).toBe(true);
+    const stopped = robot.partPose('torso').p;
+    run(robot, 3);
+    const p = robot.partPose('torso').p;
+    expect(Math.hypot(p.x - stopped.x, p.z - stopped.z)).toBeLessThan(0.15);
   });
 
   it('keeps its feet when poked from the side', async () => {
@@ -304,6 +324,30 @@ describe('salamander', () => {
       const stats = run(r, 8);
       expect(r.telemetry().forwardDistance, `${iterations} iterations`).toBeGreaterThan(1.5);
       expect(stats.maxTilt).toBeLessThan(30 * DEG);
+      sim!.dispose();
+      sim = null;
+    }
+  });
+
+  it('walks on in its new direction after a turn instead of swinging back', async () => {
+    for (const [key, direction] of [['ArrowLeft', 1], ['KeyD', -1]] as const) {
+      const robot = await spawn(salamander());
+      run(robot, 1);
+      robot.sim.keys.add(key);
+      run(robot, 2);
+      robot.sim.keys.clear();
+      run(robot, 1.5);
+      // Its head sways, so the direction of travel is measured over about three steps at a time.
+      const directions: number[] = [];
+      let from = robot.partPose('trunk').p;
+      for (let i = 0; i < 3; i++) {
+        run(robot, 2);
+        const to = robot.partPose('trunk').p;
+        directions.push(Math.atan2(to.x - from.x, to.z - from.z)); // it starts out along +z
+        from = to;
+      }
+      for (const d of directions) expect(direction * d, key).toBeGreaterThan(45 * DEG);
+      expect(Math.max(...directions) - Math.min(...directions), key).toBeLessThan(10 * DEG);
       sim!.dispose();
       sim = null;
     }

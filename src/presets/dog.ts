@@ -1,7 +1,6 @@
-import type { Blueprint } from '../core/blueprint';
+import type { Blueprint, DofSpec } from '../core/blueprint';
 import { RobotBuilder } from '../core/builder';
-import type { DofSpec } from '../core/blueprint';
-import { walkerBrain } from './walker';
+import { num, walkerBrain } from './walker';
 
 export interface DogOptions {
   /** Steps per second. */
@@ -13,8 +12,6 @@ export interface DogOptions {
   /** Hip angle of the standing crouch (rad); the knee bends twice as much the other way. */
   crouch?: number;
 }
-
-const num = (x: number): string => Number(x.toFixed(4)).toString();
 
 /**
  * Quadruped that trots off on its own and can be steered (see `walkerBrain`

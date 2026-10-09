@@ -172,6 +172,10 @@ The Dog, Spider and Salamander are built from the same recipe:
 - **Steering with heading hold.** `heading = hold(yaw, steer != 0)` remembers
   where the robot pointed when the keys were released, and
   `atan2(sin(heading - yaw), cos(heading - yaw))` is the error to steer by.
+  Hold something steady: the Salamander's head (its root) swings with every
+  step and against every turn, so it holds its trunk's heading (`yaw` plus the
+  spine angles in between) averaged over a quarter second, and keeps following
+  it for a second after the key comes up, while it comes out of the turn.
 
 ## Blueprints and the code API
 
@@ -233,9 +237,9 @@ console.log(robot.jointPosition('swing'), robot.worstConnection());
 - **assembly** — every part type snaps onto every other at every pair of snap points (over 1,000 combinations) with zero gap and opposed normals; turning, starting poses, long chains, spawning on the ground.
 - **blueprint** — validation catches duplicate ids, unknown parts/snaps/joints/DOFs, a snap used twice, two parents, loops, disconnected parts, bad limits, broken formulas and circular channels; JSON round-trips.
 - **edit** — building a walker click by click through the same operations the UI uses.
-- **signals / brain** — the expression language, waves, keyboard modes, channels, overrides.
-- **physics-joints** — in Rapier, every joint type stays connected (sub-millimetre, sub-degree) while being thrown around and respects its limits; free joints swing, springs return, servos track, motors spin, strength limits bind, logic can read other joints, overlapping parts ignore each other, live retuning works; touch sensors count only real contact; wheels roll without hopping and the ground follows robots that travel far, even in opposite directions.
-- **scenarios** — the dog trots off, steers both ways and holds its new heading, backs up, stops and restarts on Space and keeps its feet when poked, for any solver quality from 8 to 16 iterations; the spider walks on its feet alone in two alternating groups of four legs, steers and spins on the spot; the salamander owes much of its speed to its body wave and stalls when the wave is mistimed; the balancer stays up only with its feedback loop, drives, turns and catches a shove to the head; the hexapod walks, the rover drives and turns on the right keys, the snake's motion comes from its wave, the arm jogs and holds, the pendulum conserves energy.
+- **signals / brain** — the expression language, waves, keyboard modes, channels, overrides; a live edit keeps the state of the signals it did not touch.
+- **physics-joints** — in Rapier, every joint type stays connected (sub-millimetre, sub-degree) while being thrown around and respects its limits; free joints swing, springs return, servos track, motors spin, strength limits bind, logic can read other joints, overlapping parts ignore each other, live retuning works; touch sensors count only real contact; a wheel weighs and spins up like the solid disc it looks like; wheels roll without hopping, and the ground is there however far robots drive, even in opposite directions.
+- **scenarios** — the dog trots off, steers both ways and holds its new heading, backs up, stops and restarts on Space (and stays stopped while it is tuned) and keeps its feet when poked, for any solver quality from 8 to 16 iterations; the spider walks on its feet alone in two alternating groups of four legs, steers and spins on the spot; the salamander owes much of its speed to its body wave and stalls when the wave is mistimed, and walks on in its new direction after a turn; the balancer stays up only with its feedback loop, drives, turns and catches a shove to the head; the hexapod walks, the rover drives and turns on the right keys, the snake's motion comes from its wave, the arm jogs and holds, the pendulum conserves energy.
 
 ## How it is put together
 
@@ -269,7 +273,7 @@ zero-speed velocity motor as viscous friction. Rapier pushes each driven axis of
 a multi-axis joint about the parent's fixed axis, which stops matching the
 measured angle once the joint is bent, and it does not carry joint impulses over
 from one step to the next — so such a joint holds much less firmly than a hinge
-when it is bent and loaded (see *Making a walker work*). The ground is a 40 m slab that slides along under
-the robots (and widens if several of them spread out): against a much larger box Rapier's contacts dip by millimetres,
-enough to make a slowly rolling wheel hop. `touching()` counts contact within
+when it is bent and loaded (see *Making a walker work*). The ground is an
+endless plane: against a large box Rapier's contacts dip by millimetres, enough
+to make a slowly rolling wheel hop. `touching()` counts contact within
 3 mm, because Rapier also reports predicted contacts centimetres away.

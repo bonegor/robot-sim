@@ -1,6 +1,6 @@
 import type { Blueprint, DofSpec } from '../core/blueprint';
 import { RobotBuilder } from '../core/builder';
-import { walkerBrain } from './walker';
+import { num, walkerBrain } from './walker';
 
 export interface SalamanderOptions {
   /** Steps per second. */
@@ -10,8 +10,6 @@ export interface SalamanderOptions {
   /** Timing of the body wave against the legs, in cycles (0.5 helps the stride most). */
   wavePhase?: number;
 }
-
-const num = (x: number): string => Number(x.toFixed(4)).toString();
 
 /**
  * Sprawling quadruped in the colours of a fire salamander: its legs stick
@@ -29,7 +27,7 @@ const num = (x: number): string => Number(x.toFixed(4)).toString();
  * with `wavePhase` 0.5 it walks about 40% faster than on its legs alone,
  * while the opposite timing stalls it. The tail carries the wave on
  * as a travelling wave, and the neck turns against it so the head looks
- * where it is going. It steers by bending its spine into the turn.
+ * where it is going. It steers with unequal strides and a bend in its spine.
  */
 export function salamander(options: SalamanderOptions = {}): Blueprint {
   const f = options.frequency ?? 1.4;
@@ -58,7 +56,16 @@ export function salamander(options: SalamanderOptions = {}): Blueprint {
 
   const b = new RobotBuilder('Salamander', 'Sprawling quadruped whose spine and tail wave in step with its legs; steerable.')
     .root('head', 'block', { size: { x: 0.1, y: 0.05, z: 0.11 }, density: 600, color: black });
-  walkerBrain(b, { frequency: f, stride, turnGain: 1, reverse: -0.6, steadyHeading: 0.5 });
+  // Steering bends the spine, which swings the head (the root) against the
+  // turn, so the heading to hold is the trunk's: the head's yaw plus the
+  // bends in between. The body takes about a second to come out of a turn.
+  walkerBrain(b, {
+    frequency: f,
+    stride,
+    turnGain: 1,
+    reverse: -0.6,
+    heading: { yaw: 'yaw + angle("neck") + angle("spine1")', smoothing: 0.25, settle: 1 },
+  });
   for (const face of ['left', 'right'] as const) {
     b.attach(`eye_${face}`, 'weld', `head.${face}`, { id: `eyeball_${face}`, type: 'sphere', size: { radius: 0.014 }, density: 300, color: '#111111' });
   }

@@ -32,6 +32,7 @@ export class Viewport {
   readonly controls: OrbitControls;
   readonly sun: THREE.DirectionalLight;
   readonly overlay = new THREE.Group();
+  private readonly ground: THREE.Mesh;
   private readonly raycaster = new THREE.Raycaster();
   private readonly timer = new THREE.Timer();
   private frameCallbacks: ((dt: number) => void)[] = [];
@@ -75,11 +76,11 @@ export class Viewport {
 
     const tex = groundTexture();
     tex.repeat.set(200, 200);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
-    ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = true;
-    ground.userData = { kind: 'ground' };
-    this.scene.add(ground);
+    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+    this.ground.rotation.x = -Math.PI / 2;
+    this.ground.receiveShadow = true;
+    this.ground.userData = { kind: 'ground' };
+    this.scene.add(this.ground);
 
     // Metre markers along X and Z.
     const axes = new THREE.Group();
@@ -110,10 +111,12 @@ export class Viewport {
       this.controls.target.add(delta);
       this.camera.position.add(delta);
     }
-    // Keep the shadow camera centred on what we are looking at.
+    // Keep the shadow camera centred on what we are looking at, and the ground
+    // under it (moved in whole metres, so its tiles stay put).
     const t = this.controls.target;
     this.sun.position.set(t.x + 2.5, t.y + 5, t.z + 3);
     this.sun.target.position.copy(t);
+    this.ground.position.set(Math.round(t.x), 0, Math.round(t.z));
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }

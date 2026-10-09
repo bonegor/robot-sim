@@ -585,11 +585,12 @@ class Compiler {
         };
       }
       case 'hold': {
-        // Tracks x while the condition is true; otherwise keeps the last value.
+        // Tracks x while the condition is true; otherwise keeps the last value
+        // (starting from x's first value, like smooth).
         const [x, cond] = this.numArgs(name, args, pos, [2, 2]) as [Fn, Fn];
-        let held = 0;
+        let held: number | undefined;
         return (rt) => {
-          if (cond(rt) !== 0) held = x(rt);
+          if (held === undefined || cond(rt) !== 0) held = x(rt);
           return held;
         };
       }

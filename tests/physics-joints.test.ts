@@ -314,6 +314,18 @@ describe('building', () => {
     }
   });
 
+  it('a wheel resists spinning up like a solid disc of its size', async () => {
+    sim = await Simulation.create({ ground: false, gravity: 0 });
+    const inertia = (type: 'wheel' | 'disc', x: number) => {
+      const bp = new RobotBuilder(type).root('p', type, { size: { radius: 0.1, thickness: 0.04 }, density: 700 }).spawn({ position: { x, y: 1, z: 0 } }).build();
+      const i = sim!.addRobot(bp).parts.get('p')!.body.principalInertia();
+      return [i.x, i.y, i.z].sort((a, b) => a - b);
+    };
+    const wheel = inertia('wheel', 0);
+    const disc = inertia('disc', 1);
+    wheel.forEach((v, k) => expect(v).toBeCloseTo(disc[k]!, 7));
+  });
+
   it('touch sensors ignore parts that are merely close to the ground', async () => {
     // Four feet hold the plate up; the belly ball hangs 1.5 cm short of the floor.
     const b = new RobotBuilder('belly').root('body', 'plate');
