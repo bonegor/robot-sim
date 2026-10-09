@@ -270,9 +270,9 @@ export class Robot implements BrainSenses {
         .setRotation(part.pose.q);
       const body = world.createRigidBody(desc);
       const cdesc = colliderDesc(R, part.shape).setFriction(part.friction);
-      // Rapier leaves the rounded rim of a wheel out of its mass and inertia
-      // (40% of the mass of a stock wheel), so rounded shapes get both set
-      // directly, as for a solid cylinder about local Y.
+      // Rapier leaves the rounded rim of a wheel out of its mass and inertia,
+      // which keeps only 40% of a stock wheel's mass, so rounded shapes get
+      // both set directly, as for a solid cylinder about local Y.
       if (part.shape.kind === 'cylinder' && part.shape.rounding) {
         const mass = part.density * shapeVolume(part.shape);
         const r2 = part.shape.radius ** 2;
